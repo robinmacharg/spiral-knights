@@ -1,3 +1,32 @@
+// Sidebar resizer logic
+window.addEventListener("DOMContentLoaded", () => {
+    const sidebar = document.getElementById("sidebar");
+    const resizer = document.getElementById("resizer");
+    let dragging = false;
+
+    resizer.addEventListener("mousedown", (e) => {
+        dragging = true;
+        document.body.style.cursor = "ew-resize";
+        e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        const min = 180,
+            max = 600;
+        let newWidth = e.clientX;
+        if (newWidth < min) newWidth = min;
+        if (newWidth > max) newWidth = max;
+        sidebar.style.width = newWidth + "px";
+    });
+
+    document.addEventListener("mouseup", () => {
+        if (dragging) {
+            dragging = false;
+            document.body.style.cursor = "";
+        }
+    });
+});
 /**
  * Spiral Knights Visualizer
  *
