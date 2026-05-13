@@ -19,10 +19,14 @@
                     <div id="pieceTypes"></div>
                     <button id="addPiece">Add Piece Type</button>
                 </div>
-                <div style="margin: 16px 0">
+                <div style="margin: 16px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <button id="startBtn" style="font-weight: bold">Start</button>
                     <button id="resetBtn">Reset</button>
                     <button id="randomizeBtn" title="Randomize pieces">Randomize</button>
+                    <button id="stepBtn" title="Step through calculation">Step</button>
+                    <label style="margin-left:8px; font-size:14px;">Steps:
+                        <input id="stepCount" type="number" min="1" max="1000" value="1" style="width: 60px; margin-left:4px;" />
+                    </label>
                 </div>
                 <div style="margin: 16px 0; color: #888">
                     <div>Estimated image size: <b id="imgSize"></b> px</div>

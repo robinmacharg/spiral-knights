@@ -1,3 +1,112 @@
+const stepBtn = document.getElementById("stepBtn");
+const stepCountInput = document.getElementById("stepCount");
+
+// Step calculation state
+let stepState = null;
+
+/**
+ * Handles the Step button click. Steps through the calculation by the specified number of steps.
+ * Each step places one piece and updates the UI.
+ */
+if (stepBtn && stepCountInput) {
+    stepBtn.onclick = () => {
+        let steps = Math.max(1, Number(stepCountInput.value) || 1);
+
+        // Initialize step state if not present or config changed
+        if (!stepState || stepState.numPositions !== numPositions || JSON.stringify(stepState.pieceTypes) !== JSON.stringify(pieceTypes)) {
+            // Prepare state for stepping
+            const coords = getSpiralCoords(numPositions);
+            const used = new Array(numPositions).fill(false);
+            const attackDeltas = pieceTypes.map((pt) => getKnightMoves(pt.h, pt.v));
+            let typeIdx = 0;
+            let piecesPlaced = 0;
+            let placedArr = [];
+            let typePlaced = pieceTypes.map(() => []);
+            let typesOverlap = false;
+            for (let i = 0; i < pieceTypes.length; ++i) {
+                for (let j = i + 1; j < pieceTypes.length; ++j) {
+                    if (
+                        (pieceTypes[i].h === pieceTypes[j].h && pieceTypes[i].v === pieceTypes[j].v) ||
+                        (pieceTypes[i].h === pieceTypes[j].v && pieceTypes[i].v === pieceTypes[j].h)
+                    ) {
+                        typesOverlap = true;
+                        break;
+                    }
+                }
+                if (typesOverlap) break;
+            }
+            const attackedSet = new Set();
+            const attackedSets = typesOverlap ? pieceTypes.map(() => new Set()) : null;
+            stepState = {
+                numPositions,
+                pieceTypes: JSON.parse(JSON.stringify(pieceTypes)),
+                coords,
+                used,
+                attackDeltas,
+                typeIdx,
+                piecesPlaced,
+                placedArr,
+                typePlaced,
+                typesOverlap,
+                attackedSet,
+                attackedSets
+            };
+        }
+
+        // Step through the calculation
+        let s = 0;
+        while (s < steps && stepState.piecesPlaced < stepState.numPositions) {
+            let found = false;
+            for (let pos = 1; pos <= stepState.numPositions; ++pos) {
+                if (stepState.used[pos - 1]) continue;
+                const { x, y } = stepState.coords[pos - 1];
+                let attacked = false;
+                if (!stepState.typesOverlap) {
+                    if (stepState.attackedSet.has(`${x},${y}`)) attacked = true;
+                } else {
+                    for (let otherType = 0; otherType < stepState.pieceTypes.length; ++otherType) {
+                        if (otherType === stepState.typeIdx) continue;
+                        const key = `${x},${y}`;
+                        if (stepState.attackedSets[otherType].has(key)) {
+                            attacked = true;
+                            break;
+                        }
+                    }
+                }
+                if (attacked) continue;
+                // Place piece
+                stepState.placedArr.push({ pos, x, y, typeIdx: stepState.typeIdx });
+                stepState.typePlaced[stepState.typeIdx].push({ x, y });
+                stepState.used[pos - 1] = true;
+                stepState.piecesPlaced++;
+                // Update attacked set(s)
+                const moves = stepState.attackDeltas[stepState.typeIdx];
+                if (!stepState.typesOverlap) {
+                    for (const [dx, dy] of moves) {
+                        const ax = x + dx;
+                        const ay = y + dy;
+                        stepState.attackedSet.add(`${ax},${ay}`);
+                    }
+                } else {
+                    for (const [dx, dy] of moves) {
+                        const ax = x + dx;
+                        const ay = y + dy;
+                        stepState.attackedSets[stepState.typeIdx].add(`${ax},${ay}`);
+                    }
+                }
+                stepState.typeIdx = (stepState.typeIdx + 1) % stepState.pieceTypes.length;
+                found = true;
+                break;
+            }
+            if (!found) break;
+            s++;
+        }
+        // Update global placed array and redraw
+        placed = stepState.placedArr.slice();
+        drawAll && drawAll();
+        saveBtn.disabled = placed.length === 0;
+    };
+}
 // ========== Randomization Constants ==========
 const MAX_RANDOM_PIECES = 5;
 /**
@@ -556,15 +665,15 @@ const randomizeBtn = document.getElementById("randomizeBtn");
 if (randomizeBtn) {
     randomizeBtn.onclick = () => {
         const n = 2 + Math.floor(Math.random() * (MAX_RANDOM_PIECES - 1));
-        const presets = PIECE_PRESETS.filter(p => p.label !== "Other");
-        pieceTypes = Array.from({length: n}, () => {
+        const presets = PIECE_PRESETS.filter((p) => p.label !== "Other");
+        pieceTypes = Array.from({ length: n }, () => {
             const preset = presets[Math.floor(Math.random() * presets.length)];
             return {
                 name: preset.name,
                 color: randomColor(),
                 h: preset.h,
                 v: preset.v,
-                preset: preset.label
+                preset: preset.label,
             };
         });
         numPositions = DEFAULT_DOMAIN_SIZE;
