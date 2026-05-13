@@ -38,16 +38,16 @@ body {
     min-width: 0;
 }
 .piece-row input[type="color"] {
-    border: 2px solid #888;
+    border: 0px solid #888;
     background: #fff;
     width: 44px;
     height: 44px;
-    border-radius: 8px;
+    /* border-radius: 8px; */
     padding: 0;
     cursor: pointer;
-    box-shadow: 0 1px 4px #0002;
-    margin-right: 8px;
-    transition: border-color 0.2s;
+    /* box-shadow: 0 1px 4px #0002; */
+    /* margin-right: 8px; */
+    /* transition: border-color 0.2s; */
 }
 .piece-row input[type="color"]:hover,
 .piece-row input[type="color"]:focus {

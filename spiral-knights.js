@@ -1,3 +1,59 @@
+/**
+ * Spiral Knights Visualizer
+ *
+ * Main Calculation Flow (Pseudocode):
+ *
+ * 1. User configures number of positions and piece types in the UI.
+ * 2. On Start:
+ *    a. Call getSpiralCoords(numPositions) to generate spiral coordinates.
+ *    b. For each piece type, call getKnightMoves(h, v) to determine attack patterns.
+ *    c. Call placePieces(numPositions, pieceTypes) to place pieces on the spiral:
+ *        - Alternates types, avoids attacks, fills as many positions as possible.
+ *    d. While placing, periodically call drawIncremental() to draw batches of pieces for responsiveness.
+ *    e. When done, call drawAll() to render the final arrangement.
+ * 3. User can reset (resetBtn.onclick) to restore defaults, or save (saveBtn.onclick) to export PNG.
+ *
+ * Key Functions:
+ *   - getSpiralCoords: Generate spiral layout
+ *   - getKnightMoves: Get piece attack moves
+ *   - placePieces: Main placement logic
+ *   - drawIncremental: Draw batches during calculation
+ *   - drawAll: Draw final board
+ *   - renderPieceTypes: Render/edit piece controls
+ *   - setCalculating, renderStartStop: UI state
+ *   - getConfigFromState, setStateFromConfig: URL/config serialization
+ */
+// Defaults
+
+// --- Piece Presets ---
+const PIECE_PRESETS = [
+    { label: "Knight", name: "Knight", h: 1, v: 2 },
+    { label: "Alfil", name: "Alfil", h: 2, v: 2 },
+    { label: "Leaper", name: "Leaper", h: 3, v: 0 },
+    { label: "Antelope", name: "Antelope", h: 4, v: 3 },
+    { label: "Dabbaba", name: "Dabbaba", h: 2, v: 0 },
+    { label: "Wazir", name: "Wazir", h: 1, v: 0 },
+    { label: "Zebra", name: "Zebra", h: 2, v: 3 },
+    { label: "Fers", name: "Fers", h: 1, v: 1 },
+    { label: "Other", name: "Other", h: 1, v: 2 },
+];
+
+const CELL_SIZE = 48;
+const MARGIN = 32;
+const MAX_WARN_SIZE = 2000;
+const DEFAULT_DOMAIN_SIZE = 50000;
+const DEFAULT_BATCH_SIZE = 200;
+
+let numPositions = DEFAULT_DOMAIN_SIZE;
+let pieceTypes = [
+    { name: "Knight", color: "#d32f2f", h: 1, v: 2, preset: "Knight" },
+    { name: "Knight", color: "#222", h: 1, v: 2, preset: "Knight" },
+];
+let running = false;
+let calculating = false;
+let placed = [];
+let drawBatchSize = DEFAULT_BATCH_SIZE;
+
 // --- Utility Functions ---
 
 /**
@@ -94,31 +150,7 @@ function randomColor() {
     }
     return color;
 }
-// --- Piece Presets ---
-const PIECE_PRESETS = [
-    { label: "Knight", name: "Knight", h: 1, v: 2 },
-    { label: "Alfil (Elephant)", name: "Alfil", h: 2, v: 2 },
-    { label: "Leaper (3-leaper)", name: "Leaper", h: 3, v: 0 },
-    { label: "Antelope", name: "Antelope", h: 4, v: 3 },
-    { label: "Dabbaba", name: "Dabbaba", h: 2, v: 0 },
-    { label: "Wazir", name: "Wazir", h: 1, v: 0 },
-    { label: "Zebra", name: "Zebra", h: 2, v: 3 },
-    { label: "Fers", name: "Fers", h: 1, v: 1 },
-    { label: "Other", name: "Other", h: 1, v: 2 },
-];
 
-const CELL_SIZE = 48;
-const MARGIN = 32;
-const MAX_WARN_SIZE = 2000;
-let numPositions = 500;
-let pieceTypes = [
-    { name: "Knight", color: "#d32f2f", h: 1, v: 2, preset: "Knight" },
-    { name: "Knight", color: "#222", h: 1, v: 2, preset: "Knight" },
-];
-let running = false;
-let calculating = false;
-let placed = [];
-let drawBatchSize = 100;
 // --- DOM Elements ---
 const numPositionsInput = document.getElementById("numPositions");
 numPositionsInput.value = numPositions;
@@ -259,18 +291,20 @@ function renderPieceTypes() {
     if (addPieceBtn) {
         addPieceBtn.onclick = function () {
             pieceTypes.push({
-                name: "Other",
+                name: "Knight",
                 color: randomColor(),
                 h: 1,
                 v: 2,
-                preset: "Other",
+                preset: "Knight",
             });
             renderPieceTypes();
         };
     }
     warnDiv.textContent = "";
 }
+
 // --- Placement Logic ---
+
 /**
  * Places pieces on the spiral according to the rules, alternating types, and avoiding attacks.
  * Returns an array of placed piece objects with position and type.
@@ -431,6 +465,7 @@ function drawIncremental(from, to) {
 }
 
 // Redraw everything (for UI changes)
+
 /**
  * Redraws the entire board and all pieces. Used after UI changes or when calculation completes.
  */
@@ -456,7 +491,9 @@ addPieceBtn.onclick = function () {
     updateUrlFromState();
     renderPieceTypes();
 };
+
 let stopRequested = false;
+
 /**
  * Sets the calculating state and updates the Start/Stop button UI.
  */
@@ -464,6 +501,7 @@ function setCalculating(state) {
     calculating = state;
     renderStartStop();
 }
+
 /**
  * Updates the Start/Stop button to show a spinner or label depending on calculation state.
  */
@@ -474,6 +512,7 @@ function renderStartStop() {
         startBtn.textContent = "Start";
     }
 }
+
 // Spinner CSS
 if (!document.getElementById("spinner-style")) {
     const style = document.createElement("style");
@@ -481,6 +520,7 @@ if (!document.getElementById("spinner-style")) {
     style.textContent = `.spinner { display:inline-block; width:16px; height:16px; border:2px solid #bbb; border-top:2px solid #333; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-right:6px; } @keyframes spin { 100% { transform: rotate(360deg); } }`;
     document.head.appendChild(style);
 }
+
 /**
  * Handles the Start/Stop button click. Starts calculation and drawing, or stops if already running.
  * Runs the placement and drawing logic asynchronously for UI responsiveness.
@@ -551,6 +591,7 @@ startBtn.onclick = async () => {
     drawAll();
     saveBtn.disabled = placed.length === 0;
 };
+
 /**
  * Handles the Reset button click. Stops calculation, resets to default two knights and default positions, and updates the UI.
  */
@@ -565,7 +606,7 @@ resetBtn.onclick = () => {
         { name: "Knight", color: "#222", h: 1, v: 2, preset: "Knight" },
     ];
     // Reset number of positions to default (set to 50 for UI consistency)
-    numPositions = 50;
+    numPositions = DEFAULT_DOMAIN_SIZE;
     numPositionsInput.value = numPositions;
     // Clear placements
     placed = [];
@@ -576,6 +617,7 @@ resetBtn.onclick = () => {
     saveBtn.disabled = true;
     updateUrlFromState && updateUrlFromState();
 };
+
 /**
  * Handles the Save button click. Exports the current canvas as a PNG image.
  */
@@ -586,7 +628,9 @@ saveBtn.onclick = () => {
     a.download = `spiral-knights.png`;
     a.click();
 };
+
 // --- URL Config Serialization ---
+
 /**
  * Returns a serializable config object representing the current UI state.
  */
@@ -637,6 +681,7 @@ function setStateFromConfig(config) {
 function encodeConfig(config) {
     return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(config)))));
 }
+
 /**
  * Decodes a base64 config string from the URL into a config object.
  */
