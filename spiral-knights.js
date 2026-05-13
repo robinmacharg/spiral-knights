@@ -1,4 +1,9 @@
 // --- Utility Functions ---
+
+/**
+ * Returns an array of coordinates for a spiral of n positions, starting at (0,0).
+ * Caches results for efficiency.
+ */
 const spiralCoordsCache = {};
 function getSpiralCoords(n) {
     if (spiralCoordsCache[n]) return spiralCoordsCache[n];
@@ -27,6 +32,10 @@ function getSpiralCoords(n) {
     spiralCoordsCache[n] = coords;
     return coords;
 }
+/**
+ * Returns all possible moves for a piece with given h and v (like a knight).
+ * Includes all 8 L-shaped moves for the given h/v.
+ */
 function getKnightMoves(h, v) {
     const moves = [];
     for (const [dx, dy] of [
@@ -43,6 +52,10 @@ function getKnightMoves(h, v) {
     }
     return moves;
 }
+/**
+ * Estimates the required image size (width, height) in pixels for the given spiral coordinates.
+ * Adds a margin around the bounding box.
+ */
 function estimateImageSize(coords, cellSize, margin) {
     let minX = 0,
         maxX = 0,
@@ -58,6 +71,10 @@ function estimateImageSize(coords, cellSize, margin) {
     const height = (maxY - minY + 1) * cellSize + 2 * margin;
     return { width, height };
 }
+/**
+ * Returns either #111 or #fff for best contrast with the given hex color.
+ * Used for text legibility on colored backgrounds.
+ */
 function getContrastYIQ(hexcolor) {
     hexcolor = hexcolor.replace("#", "");
     const r = parseInt(hexcolor.substr(0, 2), 16);
@@ -66,6 +83,9 @@ function getContrastYIQ(hexcolor) {
     const yiq = (r * 299 + g * 587 + b * 114) / 1000;
     return yiq >= 128 ? "#111" : "#fff";
 }
+/**
+ * Generates a random hex color string.
+ */
 function randomColor() {
     const letters = "0123456789ABCDEF";
     let color = "#";
@@ -119,6 +139,10 @@ if (batchSizeInput) {
     };
 }
 // --- UI Functions ---
+/**
+ * Renders the piece type controls in the sidebar, including color, name, h/v, and remove button.
+ * Handles all UI events for piece type editing.
+ */
 function renderPieceTypes() {
     pieceTypesDiv.innerHTML = "";
     pieceTypes.forEach((p, idx) => {
@@ -247,6 +271,10 @@ function renderPieceTypes() {
     warnDiv.textContent = "";
 }
 // --- Placement Logic ---
+/**
+ * Places pieces on the spiral according to the rules, alternating types, and avoiding attacks.
+ * Returns an array of placed piece objects with position and type.
+ */
 function placePieces(numPositions, pieceTypes) {
     const coords = getSpiralCoords(numPositions);
     const placed = [];
@@ -332,6 +360,9 @@ let drawState = {
     ctx: null,
 };
 
+/**
+ * Initializes the canvas for drawing, sets up coordinate system, and draws the grid if needed.
+ */
 function initCanvas() {
     drawState.coords = getSpiralCoords(numPositions);
     const { width, height } = estimateImageSize(drawState.coords, CELL_SIZE, MARGIN);
@@ -362,6 +393,10 @@ function initCanvas() {
 }
 
 // Draw only new pieces from [from, to)
+/**
+ * Draws pieces from index 'from' to 'to' (non-inclusive) on the canvas.
+ * Used for incremental drawing during calculation.
+ */
 function drawIncremental(from, to) {
     const ctx = drawState.ctx;
     if (!ctx) return;
@@ -396,6 +431,9 @@ function drawIncremental(from, to) {
 }
 
 // Redraw everything (for UI changes)
+/**
+ * Redraws the entire board and all pieces. Used after UI changes or when calculation completes.
+ */
 function drawAll() {
     initCanvas();
     drawIncremental(0, placed.length);
@@ -419,10 +457,16 @@ addPieceBtn.onclick = function () {
     renderPieceTypes();
 };
 let stopRequested = false;
+/**
+ * Sets the calculating state and updates the Start/Stop button UI.
+ */
 function setCalculating(state) {
     calculating = state;
     renderStartStop();
 }
+/**
+ * Updates the Start/Stop button to show a spinner or label depending on calculation state.
+ */
 function renderStartStop() {
     if (calculating) {
         startBtn.innerHTML = '<span class="spinner"></span> Stop';
@@ -437,6 +481,10 @@ if (!document.getElementById("spinner-style")) {
     style.textContent = `.spinner { display:inline-block; width:16px; height:16px; border:2px solid #bbb; border-top:2px solid #333; border-radius:50%; animation:spin 1s linear infinite; vertical-align:middle; margin-right:6px; } @keyframes spin { 100% { transform: rotate(360deg); } }`;
     document.head.appendChild(style);
 }
+/**
+ * Handles the Start/Stop button click. Starts calculation and drawing, or stops if already running.
+ * Runs the placement and drawing logic asynchronously for UI responsiveness.
+ */
 startBtn.onclick = async () => {
     if (calculating) {
         stopRequested = true;
@@ -503,14 +551,34 @@ startBtn.onclick = async () => {
     drawAll();
     saveBtn.disabled = placed.length === 0;
 };
+/**
+ * Handles the Reset button click. Stops calculation, resets to default two knights and default positions, and updates the UI.
+ */
 resetBtn.onclick = () => {
-    placed = [];
+    // Stop any ongoing calculation
+    stopRequested = true;
     running = false;
     setCalculating(false);
+    // Reset to default two knights
+    pieceTypes = [
+        { name: "Knight", color: "#d32f2f", h: 1, v: 2, preset: "Knight" },
+        { name: "Knight", color: "#222", h: 1, v: 2, preset: "Knight" },
+    ];
+    // Reset number of positions to default (set to 50 for UI consistency)
+    numPositions = 50;
+    numPositionsInput.value = numPositions;
+    // Clear placements
+    placed = [];
+    // Update UI
     renderPieceTypes();
-    draw();
+    updateImageEstimate && updateImageEstimate();
+    drawAll && drawAll();
     saveBtn.disabled = true;
+    updateUrlFromState && updateUrlFromState();
 };
+/**
+ * Handles the Save button click. Exports the current canvas as a PNG image.
+ */
 saveBtn.onclick = () => {
     const url = canvas.toDataURL("image/png");
     const a = document.createElement("a");
@@ -519,11 +587,14 @@ saveBtn.onclick = () => {
     a.click();
 };
 // --- URL Config Serialization ---
+/**
+ * Returns a serializable config object representing the current UI state.
+ */
 function getConfigFromState() {
     return {
         numPositions,
         drawBatchSize,
-        pieceTypes: pieceTypes.map(p => ({
+        pieceTypes: pieceTypes.map((p) => ({
             name: p.name,
             color: p.color,
             h: p.h,
@@ -533,17 +604,21 @@ function getConfigFromState() {
     };
 }
 
+/**
+ * Sets the UI state from a config object (e.g., from URL or preset).
+ * Updates all controls and redraws.
+ */
 function setStateFromConfig(config) {
-    if (typeof config.numPositions === 'number') {
+    if (typeof config.numPositions === "number") {
         numPositions = config.numPositions;
         numPositionsInput.value = numPositions;
     }
-    if (typeof config.drawBatchSize === 'number') {
+    if (typeof config.drawBatchSize === "number") {
         drawBatchSize = config.drawBatchSize;
         if (batchSizeInput) batchSizeInput.value = drawBatchSize;
     }
     if (Array.isArray(config.pieceTypes) && config.pieceTypes.length > 0) {
-        pieceTypes = config.pieceTypes.map(pt => ({
+        pieceTypes = config.pieceTypes.map((pt) => ({
             name: pt.name,
             color: pt.color,
             h: pt.h,
@@ -556,9 +631,15 @@ function setStateFromConfig(config) {
     drawAll && drawAll();
 }
 
+/**
+ * Encodes a config object as a base64 string for use in the URL.
+ */
 function encodeConfig(config) {
     return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(config)))));
 }
+/**
+ * Decodes a base64 config string from the URL into a config object.
+ */
 function decodeConfig(str) {
     try {
         return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(str)))));
@@ -567,17 +648,23 @@ function decodeConfig(str) {
     }
 }
 
+/**
+ * Updates the browser URL to reflect the current UI state as a shareable config.
+ */
 function updateUrlFromState() {
     const config = getConfigFromState();
     const encoded = encodeConfig(config);
     const url = new URL(window.location);
-    url.searchParams.set('config', encoded);
-    window.history.replaceState({}, '', url);
+    url.searchParams.set("config", encoded);
+    window.history.replaceState({}, "", url);
 }
 
+/**
+ * Loads config from the URL (if present) and updates the UI state accordingly.
+ */
 function loadConfigFromUrl() {
     const url = new URL(window.location);
-    const encoded = url.searchParams.get('config');
+    const encoded = url.searchParams.get("config");
     if (encoded) {
         const config = decodeConfig(encoded);
         if (config) setStateFromConfig(config);
@@ -586,14 +673,14 @@ function loadConfigFromUrl() {
 
 // --- Patch event handlers to update URL ---
 const origRenderPieceTypes = renderPieceTypes;
-renderPieceTypes = function() {
+renderPieceTypes = function () {
     origRenderPieceTypes();
     // Patch all piece type controls to update URL
-    document.querySelectorAll('.piece-row').forEach((row, idx) => {
-        const selects = row.querySelectorAll('select');
-        selects.forEach(sel => {
+    document.querySelectorAll(".piece-row").forEach((row, idx) => {
+        const selects = row.querySelectorAll("select");
+        selects.forEach((sel) => {
             sel.onchange = (e) => {
-                const preset = PIECE_PRESETS.find(x => x.label === e.target.value);
+                const preset = PIECE_PRESETS.find((x) => x.label === e.target.value);
                 pieceTypes[idx].preset = preset.label;
                 pieceTypes[idx].name = preset.name;
                 pieceTypes[idx].h = preset.h;
@@ -604,34 +691,39 @@ renderPieceTypes = function() {
             };
         });
         const colorInput = row.querySelector('input[type="color"]');
-        if (colorInput) colorInput.oninput = (e) => {
-            pieceTypes[idx].color = e.target.value;
-            updateUrlFromState();
-            drawAll();
-        };
-        const nameInput = row.querySelector('input[type="text"]');
-        if (nameInput) nameInput.oninput = (e) => {
-            pieceTypes[idx].name = e.target.value;
-            updateUrlFromState();
-        };
-        const hInput = row.querySelectorAll('input[type="number"]')[0];
-        if (hInput) hInput.oninput = (e) => {
-            pieceTypes[idx].h = Number(e.target.value);
-            updateUrlFromState();
-        };
-        const vInput = row.querySelectorAll('input[type="number"]')[1];
-        if (vInput) vInput.oninput = (e) => {
-            pieceTypes[idx].v = Number(e.target.value);
-            updateUrlFromState();
-        };
-        const removeBtn = row.querySelector('button');
-        if (removeBtn) removeBtn.onclick = () => {
-            if (pieceTypes.length > 1) {
-                pieceTypes.splice(idx, 1);
+        if (colorInput)
+            colorInput.oninput = (e) => {
+                pieceTypes[idx].color = e.target.value;
                 updateUrlFromState();
-                renderPieceTypes();
-            }
-        };
+                drawAll();
+            };
+        const nameInput = row.querySelector('input[type="text"]');
+        if (nameInput)
+            nameInput.oninput = (e) => {
+                pieceTypes[idx].name = e.target.value;
+                updateUrlFromState();
+            };
+        const hInput = row.querySelectorAll('input[type="number"]')[0];
+        if (hInput)
+            hInput.oninput = (e) => {
+                pieceTypes[idx].h = Number(e.target.value);
+                updateUrlFromState();
+            };
+        const vInput = row.querySelectorAll('input[type="number"]')[1];
+        if (vInput)
+            vInput.oninput = (e) => {
+                pieceTypes[idx].v = Number(e.target.value);
+                updateUrlFromState();
+            };
+        const removeBtn = row.querySelector("button");
+        if (removeBtn)
+            removeBtn.onclick = () => {
+                if (pieceTypes.length > 1) {
+                    pieceTypes.splice(idx, 1);
+                    updateUrlFromState();
+                    renderPieceTypes();
+                }
+            };
     });
     // Update URL after every render (for add/remove)
     updateUrlFromState();
