@@ -1,6 +1,8 @@
 # Spiral Knights Visualizer
 
-A single-page web app for visualizing spiral arrangements of chess knight-like pieces, inspired by [OEIS A392177](https://oeis.org/A392177). The app allows experimentation with piece placement, alternation, attack logic, and spiral geometry, with a focus on performance and configurability.
+A single-page web app for visualizing spiral arrangements of chess knight-like pieces, inspired by [this Numberphile video](https://www.youtube.com/watch?v=UiX4CFIiegM) ([Follow-up](https://www.youtube.com/watch?v=VgmDuBCayPw)). The app allows experimentation with piece placement, alternation, attack logic, and spiral geometry, with a focus on performance and configurability.
+
+Vibe-coded with GPT-4.1.
 
 ## Features
 
