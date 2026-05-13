@@ -1,32 +1,5 @@
-// Sidebar resizer logic
-window.addEventListener("DOMContentLoaded", () => {
-    const sidebar = document.getElementById("sidebar");
-    const resizer = document.getElementById("resizer");
-    let dragging = false;
-
-    resizer.addEventListener("mousedown", (e) => {
-        dragging = true;
-        document.body.style.cursor = "ew-resize";
-        e.preventDefault();
-    });
-
-    document.addEventListener("mousemove", (e) => {
-        if (!dragging) return;
-        const min = 180,
-            max = 600;
-        let newWidth = e.clientX;
-        if (newWidth < min) newWidth = min;
-        if (newWidth > max) newWidth = max;
-        sidebar.style.width = newWidth + "px";
-    });
-
-    document.addEventListener("mouseup", () => {
-        if (dragging) {
-            dragging = false;
-            document.body.style.cursor = "";
-        }
-    });
-});
+// ========== Randomization Constants ==========
+const MAX_RANDOM_PIECES = 5;
 /**
  * Spiral Knights Visualizer
  *
@@ -368,6 +341,36 @@ function setUiEnabled(enabled) {
     if (resetBtn) resetBtn.disabled = false;
 }
 
+// Sidebar resizer logic
+window.addEventListener("DOMContentLoaded", () => {
+    const sidebar = document.getElementById("sidebar");
+    const resizer = document.getElementById("resizer");
+    let dragging = false;
+
+    resizer.addEventListener("mousedown", (e) => {
+        dragging = true;
+        document.body.style.cursor = "ew-resize";
+        e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+        const min = 180,
+            max = 600;
+        let newWidth = e.clientX;
+        if (newWidth < min) newWidth = min;
+        if (newWidth > max) newWidth = max;
+        sidebar.style.width = newWidth + "px";
+    });
+
+    document.addEventListener("mouseup", () => {
+        if (dragging) {
+            dragging = false;
+            document.body.style.cursor = "";
+        }
+    });
+});
+
 // =====================================================================================================================
 // --- Placement Logic ---
 // =====================================================================================================================
@@ -545,6 +548,36 @@ function drawAll() {
     drawState.ctx.restore();
 }
 // --- Event Handlers ---
+/**
+ * Handles the Randomize button click. Sets a random number of pieces (2 to MAX_RANDOM_PIECES), each with a random preset and color.
+ * Resets the number of positions to the default and updates the UI and URL.
+ */
+const randomizeBtn = document.getElementById("randomizeBtn");
+if (randomizeBtn) {
+    randomizeBtn.onclick = () => {
+        const n = 2 + Math.floor(Math.random() * (MAX_RANDOM_PIECES - 1));
+        const presets = PIECE_PRESETS.filter(p => p.label !== "Other");
+        pieceTypes = Array.from({length: n}, () => {
+            const preset = presets[Math.floor(Math.random() * presets.length)];
+            return {
+                name: preset.name,
+                color: randomColor(),
+                h: preset.h,
+                v: preset.v,
+                preset: preset.label
+            };
+        });
+        numPositions = DEFAULT_DOMAIN_SIZE;
+        numPositionsInput.value = numPositions;
+        placed = [];
+        renderPieceTypes();
+        updateImageEstimate && updateImageEstimate();
+        drawAll && drawAll();
+        saveBtn.disabled = true;
+        updateUrlFromState && updateUrlFromState();
+        setUiEnabled(true);
+    };
+}
 numPositionsInput.oninput = (e) => {
     numPositions = Number(e.target.value);
     updateUrlFromState();
