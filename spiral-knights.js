@@ -23,7 +23,10 @@
  *   - setCalculating, renderStartStop: UI state
  *   - getConfigFromState, setStateFromConfig: URL/config serialization
  */
+
+// =====================================================================================================================
 // Defaults
+// =====================================================================================================================
 
 // --- Piece Presets ---
 const PIECE_PRESETS = [
@@ -54,7 +57,9 @@ let calculating = false;
 let placed = [];
 let drawBatchSize = DEFAULT_BATCH_SIZE;
 
+// =====================================================================================================================
 // --- Utility Functions ---
+// =====================================================================================================================
 
 /**
  * Returns an array of coordinates for a spiral of n positions, starting at (0,0).
@@ -151,7 +156,10 @@ function randomColor() {
     return color;
 }
 
+// =====================================================================================================================
 // --- DOM Elements ---
+// =====================================================================================================================
+
 const numPositionsInput = document.getElementById("numPositions");
 numPositionsInput.value = numPositions;
 const pieceTypesDiv = document.getElementById("pieceTypes");
@@ -170,7 +178,11 @@ if (batchSizeInput) {
         draw();
     };
 }
+
+// =====================================================================================================================
 // --- UI Functions ---
+// =====================================================================================================================
+
 /**
  * Renders the piece type controls in the sidebar, including color, name, h/v, and remove button.
  * Handles all UI events for piece type editing.
@@ -301,9 +313,35 @@ function renderPieceTypes() {
         };
     }
     warnDiv.textContent = "";
+    // After rendering, re-apply UI enabled state
+    setUiEnabled(!calculating);
 }
 
+/**
+ * Enables or disables all sidebar controls except the Start/Stop button.
+ * Used to lock the UI during calculation/render.
+ */
+function setUiEnabled(enabled) {
+    // Disable all sidebar controls except Start/Stop
+    const sidebar = document.getElementById("sidebar") || document.body;
+    sidebar.querySelectorAll("input, button, select, textarea").forEach((el) => {
+        if (el === startBtn || el === resetBtn) return;
+        el.disabled = !enabled;
+    });
+    // Also explicitly disable all piece-row controls (including remove buttons and dropdowns)
+    document
+        .querySelectorAll(".piece-row button, .piece-row select, .piece-row input")
+        .forEach((el) => {
+            el.disabled = !enabled;
+        });
+    // Always keep Start/Stop enabled
+    if (startBtn) startBtn.disabled = false;
+    if (resetBtn) resetBtn.disabled = false;
+}
+
+// =====================================================================================================================
 // --- Placement Logic ---
+// =====================================================================================================================
 
 /**
  * Places pieces on the spiral according to the rules, alternating types, and avoiding attacks.
@@ -384,7 +422,10 @@ function placePieces(numPositions, pieceTypes) {
     }
     return placed;
 }
+// =====================================================================================================================
 // --- Drawing ---
+// =====================================================================================================================
+
 // --- Canvas Drawing Helpers ---
 let drawState = {
     width: 0,
@@ -532,6 +573,7 @@ startBtn.onclick = async () => {
     }
     stopRequested = false;
     setCalculating(true);
+    setUiEnabled(false);
     placed = [];
     running = true;
     renderPieceTypes();
@@ -587,6 +629,7 @@ startBtn.onclick = async () => {
         }
     }
     setCalculating(false);
+    setUiEnabled(true);
     running = true;
     drawAll();
     saveBtn.disabled = placed.length === 0;
@@ -616,6 +659,7 @@ resetBtn.onclick = () => {
     drawAll && drawAll();
     saveBtn.disabled = true;
     updateUrlFromState && updateUrlFromState();
+    setUiEnabled(true);
 };
 
 /**
@@ -629,7 +673,9 @@ saveBtn.onclick = () => {
     a.click();
 };
 
+// =====================================================================================================================
 // --- URL Config Serialization ---
+// =====================================================================================================================
 
 /**
  * Returns a serializable config object representing the current UI state.
@@ -773,11 +819,13 @@ renderPieceTypes = function () {
     // Update URL after every render (for add/remove)
     updateUrlFromState();
 };
+
 numPositionsInput.oninput = (e) => {
     numPositions = Number(e.target.value);
     updateUrlFromState();
     updateImageEstimate();
 };
+
 if (batchSizeInput) {
     batchSizeInput.value = drawBatchSize;
     batchSizeInput.oninput = (e) => {
@@ -786,6 +834,7 @@ if (batchSizeInput) {
         drawAll();
     };
 }
+
 addPieceBtn.onclick = function () {
     pieceTypes.push({
         name: "Other",
@@ -798,7 +847,10 @@ addPieceBtn.onclick = function () {
     renderPieceTypes();
 };
 
+// =====================================================================================================================
 // --- Initial Render ---
+// =====================================================================================================================
+
 loadConfigFromUrl();
 renderPieceTypes();
 updateImageEstimate();
