@@ -4,6 +4,8 @@ A single-page web app for visualizing spiral arrangements of chess knight-like p
 
 Vibe-coded with GPT-4.1.
 
+Clone the repo and open the HTML file locally, or [Preview it here](https://refined-github-html-preview.kidonng.workers.dev/robinmacharg/spiral-knights/raw/refs/heads/main/spiral-knights.html)
+
 ## Features
 
 - **Spiral Generation**
