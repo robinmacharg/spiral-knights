@@ -404,6 +404,7 @@ function drawAll() {
 // --- Event Handlers ---
 numPositionsInput.oninput = (e) => {
     numPositions = Number(e.target.value);
+    updateUrlFromState();
     updateImageEstimate();
 };
 addPieceBtn.onclick = function () {
@@ -414,6 +415,7 @@ addPieceBtn.onclick = function () {
         v: 2,
         preset: "Other",
     });
+    updateUrlFromState();
     renderPieceTypes();
 };
 let stopRequested = false;
@@ -516,7 +518,151 @@ saveBtn.onclick = () => {
     a.download = `spiral-knights.png`;
     a.click();
 };
+// --- URL Config Serialization ---
+function getConfigFromState() {
+    return {
+        numPositions,
+        drawBatchSize,
+        pieceTypes: pieceTypes.map(p => ({
+            name: p.name,
+            color: p.color,
+            h: p.h,
+            v: p.v,
+            preset: p.preset || null,
+        })),
+    };
+}
+
+function setStateFromConfig(config) {
+    if (typeof config.numPositions === 'number') {
+        numPositions = config.numPositions;
+        numPositionsInput.value = numPositions;
+    }
+    if (typeof config.drawBatchSize === 'number') {
+        drawBatchSize = config.drawBatchSize;
+        if (batchSizeInput) batchSizeInput.value = drawBatchSize;
+    }
+    if (Array.isArray(config.pieceTypes) && config.pieceTypes.length > 0) {
+        pieceTypes = config.pieceTypes.map(pt => ({
+            name: pt.name,
+            color: pt.color,
+            h: pt.h,
+            v: pt.v,
+            preset: pt.preset || null,
+        }));
+    }
+    renderPieceTypes();
+    updateImageEstimate && updateImageEstimate();
+    drawAll && drawAll();
+}
+
+function encodeConfig(config) {
+    return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(config)))));
+}
+function decodeConfig(str) {
+    try {
+        return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(str)))));
+    } catch (e) {
+        return null;
+    }
+}
+
+function updateUrlFromState() {
+    const config = getConfigFromState();
+    const encoded = encodeConfig(config);
+    const url = new URL(window.location);
+    url.searchParams.set('config', encoded);
+    window.history.replaceState({}, '', url);
+}
+
+function loadConfigFromUrl() {
+    const url = new URL(window.location);
+    const encoded = url.searchParams.get('config');
+    if (encoded) {
+        const config = decodeConfig(encoded);
+        if (config) setStateFromConfig(config);
+    }
+}
+
+// --- Patch event handlers to update URL ---
+const origRenderPieceTypes = renderPieceTypes;
+renderPieceTypes = function() {
+    origRenderPieceTypes();
+    // Patch all piece type controls to update URL
+    document.querySelectorAll('.piece-row').forEach((row, idx) => {
+        const selects = row.querySelectorAll('select');
+        selects.forEach(sel => {
+            sel.onchange = (e) => {
+                const preset = PIECE_PRESETS.find(x => x.label === e.target.value);
+                pieceTypes[idx].preset = preset.label;
+                pieceTypes[idx].name = preset.name;
+                pieceTypes[idx].h = preset.h;
+                pieceTypes[idx].v = preset.v;
+                updateUrlFromState();
+                renderPieceTypes();
+                drawAll();
+            };
+        });
+        const colorInput = row.querySelector('input[type="color"]');
+        if (colorInput) colorInput.oninput = (e) => {
+            pieceTypes[idx].color = e.target.value;
+            updateUrlFromState();
+            drawAll();
+        };
+        const nameInput = row.querySelector('input[type="text"]');
+        if (nameInput) nameInput.oninput = (e) => {
+            pieceTypes[idx].name = e.target.value;
+            updateUrlFromState();
+        };
+        const hInput = row.querySelectorAll('input[type="number"]')[0];
+        if (hInput) hInput.oninput = (e) => {
+            pieceTypes[idx].h = Number(e.target.value);
+            updateUrlFromState();
+        };
+        const vInput = row.querySelectorAll('input[type="number"]')[1];
+        if (vInput) vInput.oninput = (e) => {
+            pieceTypes[idx].v = Number(e.target.value);
+            updateUrlFromState();
+        };
+        const removeBtn = row.querySelector('button');
+        if (removeBtn) removeBtn.onclick = () => {
+            if (pieceTypes.length > 1) {
+                pieceTypes.splice(idx, 1);
+                updateUrlFromState();
+                renderPieceTypes();
+            }
+        };
+    });
+    // Update URL after every render (for add/remove)
+    updateUrlFromState();
+};
+numPositionsInput.oninput = (e) => {
+    numPositions = Number(e.target.value);
+    updateUrlFromState();
+    updateImageEstimate();
+};
+if (batchSizeInput) {
+    batchSizeInput.value = drawBatchSize;
+    batchSizeInput.oninput = (e) => {
+        drawBatchSize = Math.max(1, Number(e.target.value));
+        updateUrlFromState();
+        drawAll();
+    };
+}
+addPieceBtn.onclick = function () {
+    pieceTypes.push({
+        name: "Other",
+        color: randomColor(),
+        h: 1,
+        v: 2,
+        preset: "Other",
+    });
+    updateUrlFromState();
+    renderPieceTypes();
+};
+
 // --- Initial Render ---
+loadConfigFromUrl();
 renderPieceTypes();
 updateImageEstimate();
 drawAll();
