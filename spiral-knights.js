@@ -1,5 +1,7 @@
 // --- Utility Functions ---
+const spiralCoordsCache = {};
 function getSpiralCoords(n) {
+    if (spiralCoordsCache[n]) return spiralCoordsCache[n];
     const coords = [];
     let x = 0,
         y = 0,
@@ -22,6 +24,7 @@ function getSpiralCoords(n) {
             if (segmentCount % 2 === 0) segmentLength++;
         }
     }
+    spiralCoordsCache[n] = coords;
     return coords;
 }
 function getKnightMoves(h, v) {
@@ -115,7 +118,7 @@ function renderPieceTypes() {
 
         // Preset dropdown
         const presetSelect = document.createElement("select");
-        PIECE_PRESETS.forEach(opt => {
+        PIECE_PRESETS.forEach((opt) => {
             const option = document.createElement("option");
             option.value = opt.label;
             option.textContent = opt.label;
@@ -124,7 +127,7 @@ function renderPieceTypes() {
         });
         presetSelect.title = "Choose a mythical piece or Other";
         presetSelect.onchange = (e) => {
-            const sel = PIECE_PRESETS.find(x => x.label === e.target.value);
+            const sel = PIECE_PRESETS.find((x) => x.label === e.target.value);
             pieceTypes[idx].preset = sel.label;
             pieceTypes[idx].name = sel.name;
             pieceTypes[idx].h = sel.h;
@@ -157,7 +160,7 @@ function renderPieceTypes() {
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.value = p.name;
-        nameInput.disabled = (p.preset && p.preset !== "Other");
+        nameInput.disabled = p.preset && p.preset !== "Other";
         nameInput.title = "Piece name";
         nameInput.oninput = (e) => {
             pieceTypes[idx].name = e.target.value;
@@ -179,7 +182,7 @@ function renderPieceTypes() {
         hInput.value = p.h;
         hInput.min = 0;
         hInput.max = 10;
-        hInput.disabled = (p.preset && p.preset !== "Other");
+        hInput.disabled = p.preset && p.preset !== "Other";
         hInput.title = "Horizontal component";
         hInput.oninput = (e) => {
             pieceTypes[idx].h = Number(e.target.value);
@@ -194,7 +197,7 @@ function renderPieceTypes() {
         vInput.value = p.v;
         vInput.min = 0;
         vInput.max = 10;
-        vInput.disabled = (p.preset && p.preset !== "Other");
+        vInput.disabled = p.preset && p.preset !== "Other";
         vInput.title = "Vertical component";
         vInput.oninput = (e) => {
             pieceTypes[idx].v = Number(e.target.value);
@@ -240,29 +243,45 @@ function placePieces(numPositions, pieceTypes) {
     const placed = [];
     const typePlaced = pieceTypes.map(() => []);
     const used = new Array(numPositions).fill(false);
-    // Compute max attack distance for bounding box
-    let maxRange = 1;
-    for (const p of pieceTypes) {
-        maxRange = Math.max(maxRange, Math.abs(p.h), Math.abs(p.v));
+    // Precompute attack deltas for each piece type
+    const attackDeltas = pieceTypes.map((pt) => getKnightMoves(pt.h, pt.v));
+    // Check if piece types overlap (i.e., any two types have the same h/v)
+    let typesOverlap = false;
+    for (let i = 0; i < pieceTypes.length; ++i) {
+        for (let j = i + 1; j < pieceTypes.length; ++j) {
+            if (
+                (pieceTypes[i].h === pieceTypes[j].h && pieceTypes[i].v === pieceTypes[j].v) ||
+                (pieceTypes[i].h === pieceTypes[j].v && pieceTypes[i].v === pieceTypes[j].h)
+            ) {
+                typesOverlap = true;
+                break;
+            }
+        }
+        if (typesOverlap) break;
     }
+    // Use a single attacked set if types don't overlap, else per-type
+    const attackedSet = new Set();
+    const attackedSets = typesOverlap ? pieceTypes.map(() => new Set()) : null;
     let typeIdx = 0;
     let piecesPlaced = 0;
-    // Prepare attacked sets for each type
-    const attackedSets = pieceTypes.map(() => new Set());
     while (piecesPlaced < numPositions) {
-        // Always search from the smallest unused position
         let found = false;
         for (let pos = 1; pos <= numPositions; ++pos) {
             if (used[pos - 1]) continue;
             const { x, y } = coords[pos - 1];
-            // Check if attacked by any other type
             let attacked = false;
-            for (let otherType = 0; otherType < pieceTypes.length; ++otherType) {
-                if (otherType === typeIdx) continue;
-                const key = `${x},${y}`;
-                if (attackedSets[otherType].has(key)) {
-                    attacked = true;
-                    break;
+            if (!typesOverlap) {
+                // Single attacked set
+                if (attackedSet.has(`${x},${y}`)) attacked = true;
+            } else {
+                // Per-type attacked sets
+                for (let otherType = 0; otherType < pieceTypes.length; ++otherType) {
+                    if (otherType === typeIdx) continue;
+                    const key = `${x},${y}`;
+                    if (attackedSets[otherType].has(key)) {
+                        attacked = true;
+                        break;
+                    }
                 }
             }
             if (attacked) continue;
@@ -271,12 +290,20 @@ function placePieces(numPositions, pieceTypes) {
             typePlaced[typeIdx].push({ x, y });
             used[pos - 1] = true;
             piecesPlaced++;
-            // Update attacked set for this type
-            const moves = getKnightMoves(pieceTypes[typeIdx].h, pieceTypes[typeIdx].v);
-            for (const [dx, dy] of moves) {
-                const ax = x + dx;
-                const ay = y + dy;
-                attackedSets[typeIdx].add(`${ax},${ay}`);
+            // Update attacked set(s)
+            const moves = attackDeltas[typeIdx];
+            if (!typesOverlap) {
+                for (const [dx, dy] of moves) {
+                    const ax = x + dx;
+                    const ay = y + dy;
+                    attackedSet.add(`${ax},${ay}`);
+                }
+            } else {
+                for (const [dx, dy] of moves) {
+                    const ax = x + dx;
+                    const ay = y + dy;
+                    attackedSets[typeIdx].add(`${ax},${ay}`);
+                }
             }
             typeIdx = (typeIdx + 1) % pieceTypes.length;
             found = true;
