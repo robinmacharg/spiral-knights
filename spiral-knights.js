@@ -71,14 +71,26 @@ function randomColor() {
     }
     return color;
 }
-// --- State ---
+// --- Piece Presets ---
+const PIECE_PRESETS = [
+    { label: "Knight", name: "Knight", h: 1, v: 2 },
+    { label: "Alfil (Elephant)", name: "Alfil", h: 2, v: 2 },
+    { label: "Leaper (3-leaper)", name: "Leaper", h: 3, v: 0 },
+    { label: "Antelope", name: "Antelope", h: 4, v: 3 },
+    { label: "Dabbaba", name: "Dabbaba", h: 2, v: 0 },
+    { label: "Wazir", name: "Wazir", h: 1, v: 0 },
+    { label: "Zebra", name: "Zebra", h: 2, v: 3 },
+    { label: "Fers", name: "Fers", h: 1, v: 1 },
+    { label: "Other", name: "Other", h: 1, v: 2 },
+];
+
 const CELL_SIZE = 48;
 const MARGIN = 32;
 const MAX_WARN_SIZE = 2000;
 let numPositions = 500;
 let pieceTypes = [
-    { name: "Red Knight", color: "#d32f2f", h: 1, v: 2 },
-    { name: "Black Knight", color: "#222", h: 1, v: 2 },
+    { name: "Knight", color: "#d32f2f", h: 1, v: 2, preset: "Knight" },
+    { name: "Knight", color: "#222", h: 1, v: 2, preset: "Knight" },
 ];
 let running = false;
 let calculating = false;
@@ -100,7 +112,35 @@ function renderPieceTypes() {
     pieceTypes.forEach((p, idx) => {
         const row = document.createElement("div");
         row.className = "piece-row";
+
+        // Preset dropdown
+        const presetSelect = document.createElement("select");
+        PIECE_PRESETS.forEach(opt => {
+            const option = document.createElement("option");
+            option.value = opt.label;
+            option.textContent = opt.label;
+            if ((p.preset || p.name) === opt.label) option.selected = true;
+            presetSelect.appendChild(option);
+        });
+        presetSelect.title = "Choose a mythical piece or Other";
+        presetSelect.onchange = (e) => {
+            const sel = PIECE_PRESETS.find(x => x.label === e.target.value);
+            pieceTypes[idx].preset = sel.label;
+            pieceTypes[idx].name = sel.name;
+            pieceTypes[idx].h = sel.h;
+            pieceTypes[idx].v = sel.v;
+            renderPieceTypes();
+            draw();
+        };
+        row.appendChild(presetSelect);
+
         // Color
+        const colorLabel = document.createElement("label");
+        colorLabel.style.display = "flex";
+        colorLabel.style.alignItems = "center";
+        colorLabel.style.gap = "4px";
+        colorLabel.title = "Piece color";
+        colorLabel.innerHTML = '<span style="font-size:13px;color:#444;">Color:</span>';
         const colorInput = document.createElement("input");
         colorInput.type = "color";
         colorInput.value = p.color;
@@ -108,45 +148,61 @@ function renderPieceTypes() {
         colorInput.title = "Piece color";
         colorInput.oninput = (e) => {
             pieceTypes[idx].color = e.target.value;
-            renderPieceTypes();
+            draw(); // Update board immediately
         };
-        row.appendChild(colorInput);
+        colorLabel.appendChild(colorInput);
+        row.appendChild(colorLabel);
+
         // Name
         const nameInput = document.createElement("input");
         nameInput.type = "text";
         nameInput.value = p.name;
-        nameInput.disabled = false;
+        nameInput.disabled = (p.preset && p.preset !== "Other");
         nameInput.title = "Piece name";
         nameInput.oninput = (e) => {
             pieceTypes[idx].name = e.target.value;
         };
         row.appendChild(nameInput);
-        // H
-        row.appendChild(document.createTextNode("H:"));
+
+        // H and V controls in a sub-container for better wrapping
+        const hvContainer = document.createElement("span");
+        hvContainer.style.display = "flex";
+        hvContainer.style.alignItems = "center";
+        hvContainer.style.gap = "4px";
+        hvContainer.style.flexWrap = "wrap";
+
+        const hLabel = document.createElement("span");
+        hLabel.textContent = "H:";
+        hvContainer.appendChild(hLabel);
         const hInput = document.createElement("input");
         hInput.type = "number";
         hInput.value = p.h;
-        hInput.min = 1;
+        hInput.min = 0;
         hInput.max = 10;
-        hInput.disabled = false;
+        hInput.disabled = (p.preset && p.preset !== "Other");
         hInput.title = "Horizontal component";
         hInput.oninput = (e) => {
             pieceTypes[idx].h = Number(e.target.value);
         };
-        row.appendChild(hInput);
-        // V
-        row.appendChild(document.createTextNode("V:"));
+        hvContainer.appendChild(hInput);
+
+        const vLabel = document.createElement("span");
+        vLabel.textContent = "V:";
+        hvContainer.appendChild(vLabel);
         const vInput = document.createElement("input");
         vInput.type = "number";
         vInput.value = p.v;
-        vInput.min = 1;
+        vInput.min = 0;
         vInput.max = 10;
-        vInput.disabled = false;
+        vInput.disabled = (p.preset && p.preset !== "Other");
         vInput.title = "Vertical component";
         vInput.oninput = (e) => {
             pieceTypes[idx].v = Number(e.target.value);
         };
-        row.appendChild(vInput);
+        hvContainer.appendChild(vInput);
+
+        row.appendChild(hvContainer);
+
         // Remove
         const removeBtn = document.createElement("button");
         removeBtn.textContent = "×";
@@ -161,16 +217,22 @@ function renderPieceTypes() {
         row.appendChild(removeBtn);
         pieceTypesDiv.appendChild(row);
     });
-}
-function updateImageEstimate() {
-    const coords = getSpiralCoords(numPositions);
-    const { width, height } = estimateImageSize(coords, CELL_SIZE, MARGIN);
-    imgSizeDiv.textContent = `${width} × ${height}`;
-    if (width > MAX_WARN_SIZE || height > MAX_WARN_SIZE) {
-        warnDiv.textContent = `Warning: Estimated image size is ${width}x${height}px. This may be slow or fail to render.`;
-    } else {
-        warnDiv.textContent = "";
+
+    // Re-attach addPieceBtn handler after render
+    const addPieceBtn = document.getElementById("addPiece");
+    if (addPieceBtn) {
+        addPieceBtn.onclick = function () {
+            pieceTypes.push({
+                name: "Other",
+                color: randomColor(),
+                h: 1,
+                v: 2,
+                preset: "Other",
+            });
+            renderPieceTypes();
+        };
     }
+    warnDiv.textContent = "";
 }
 // --- Placement Logic ---
 function placePieces(numPositions, pieceTypes) {
@@ -284,12 +346,13 @@ numPositionsInput.oninput = (e) => {
     numPositions = Number(e.target.value);
     updateImageEstimate();
 };
-addPieceBtn.onclick = () => {
+addPieceBtn.onclick = function () {
     pieceTypes.push({
-        name: `Piece ${pieceTypes.length + 1}`,
+        name: "Other",
         color: randomColor(),
         h: 1,
         v: 2,
+        preset: "Other",
     });
     renderPieceTypes();
 };
