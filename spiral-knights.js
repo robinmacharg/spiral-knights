@@ -98,6 +98,7 @@ let pieceTypes = [
 let running = false;
 let calculating = false;
 let placed = [];
+let drawBatchSize = 100;
 // --- DOM Elements ---
 const numPositionsInput = document.getElementById("numPositions");
 numPositionsInput.value = numPositions;
@@ -109,6 +110,14 @@ const saveBtn = document.getElementById("saveBtn");
 const warnDiv = document.getElementById("warn");
 const imgSizeDiv = document.getElementById("imgSize");
 const canvas = document.getElementById("canvas");
+const batchSizeInput = document.getElementById("batchSize");
+if (batchSizeInput) {
+    batchSizeInput.value = drawBatchSize;
+    batchSizeInput.oninput = (e) => {
+        drawBatchSize = Math.max(1, Number(e.target.value));
+        draw();
+    };
+}
 // --- UI Functions ---
 function renderPieceTypes() {
     pieceTypesDiv.innerHTML = "";
@@ -314,33 +323,52 @@ function placePieces(numPositions, pieceTypes) {
     return placed;
 }
 // --- Drawing ---
-function draw() {
-    const coords = getSpiralCoords(numPositions);
-    const { width, height } = estimateImageSize(coords, CELL_SIZE, MARGIN);
+// --- Canvas Drawing Helpers ---
+let drawState = {
+    width: 0,
+    height: 0,
+    showDetails: false,
+    coords: [],
+    ctx: null,
+};
+
+function initCanvas() {
+    drawState.coords = getSpiralCoords(numPositions);
+    const { width, height } = estimateImageSize(drawState.coords, CELL_SIZE, MARGIN);
+    drawState.width = width;
+    drawState.height = height;
     canvas.width = width;
     canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, width, height);
-    ctx.save();
-    ctx.translate(width / 2, height / 2);
-    const showDetails = numPositions < 500;
-    if (showDetails) {
-        ctx.globalAlpha = 0.1;
-        for (const { x, y } of coords) {
-            ctx.beginPath();
-            ctx.rect(
+    drawState.ctx = canvas.getContext("2d");
+    drawState.ctx.clearRect(0, 0, width, height);
+    drawState.ctx.save();
+    drawState.ctx.translate(width / 2, height / 2);
+    drawState.showDetails = numPositions < 500;
+    // Draw grid once if needed
+    if (drawState.showDetails) {
+        drawState.ctx.globalAlpha = 0.1;
+        for (const { x, y } of drawState.coords) {
+            drawState.ctx.beginPath();
+            drawState.ctx.rect(
                 x * CELL_SIZE - CELL_SIZE / 2,
                 y * CELL_SIZE - CELL_SIZE / 2,
                 CELL_SIZE,
                 CELL_SIZE,
             );
-            ctx.stroke();
+            drawState.ctx.stroke();
         }
-        ctx.globalAlpha = 1;
+        drawState.ctx.globalAlpha = 1;
     }
-    for (const piece of placed) {
+}
+
+// Draw only new pieces from [from, to)
+function drawIncremental(from, to) {
+    const ctx = drawState.ctx;
+    if (!ctx) return;
+    for (let i = from; i < to && i < placed.length; ++i) {
+        const piece = placed[i];
         const type = pieceTypes[piece.typeIdx];
-        if (showDetails) {
+        if (drawState.showDetails) {
             ctx.beginPath();
             ctx.arc(piece.x * CELL_SIZE, piece.y * CELL_SIZE, CELL_SIZE * 0.4, 0, 2 * Math.PI);
             ctx.fillStyle = type.color;
@@ -354,7 +382,6 @@ function draw() {
             ctx.textBaseline = "middle";
             ctx.fillText(String(piece.pos), piece.x * CELL_SIZE, piece.y * CELL_SIZE);
         } else {
-            // Draw filled square, no gap
             ctx.beginPath();
             ctx.rect(
                 piece.x * CELL_SIZE - CELL_SIZE / 2,
@@ -366,7 +393,13 @@ function draw() {
             ctx.fill();
         }
     }
-    ctx.restore();
+}
+
+// Redraw everything (for UI changes)
+function drawAll() {
+    initCanvas();
+    drawIncremental(0, placed.length);
+    drawState.ctx.restore();
 }
 // --- Event Handlers ---
 numPositionsInput.oninput = (e) => {
@@ -412,10 +445,11 @@ startBtn.onclick = async () => {
     placed = [];
     running = true;
     renderPieceTypes();
-    draw();
     saveBtn.disabled = true;
+    // Initialize canvas ONCE for this run
+    initCanvas();
     // Async calculation with yield for UI responsiveness
-    const coords = getSpiralCoords(numPositions);
+    const coords = drawState.coords;
     const typePlaced = pieceTypes.map(() => []);
     const used = new Array(numPositions).fill(false);
     let maxRange = 1;
@@ -453,17 +487,18 @@ startBtn.onclick = async () => {
             }
             typeIdx = (typeIdx + 1) % pieceTypes.length;
             found = true;
-            if (piecesPlaced % 100 === 0) {
-                draw();
-                await new Promise((r) => setTimeout(r, 0));
-            }
             break;
         }
         if (!found) break;
+        // Draw incrementally every drawBatchSize placements
+        if (piecesPlaced % drawBatchSize === 0 || piecesPlaced === numPositions) {
+            drawIncremental(piecesPlaced - drawBatchSize, piecesPlaced);
+            await new Promise((r) => setTimeout(r, 0));
+        }
     }
     setCalculating(false);
     running = true;
-    draw();
+    drawAll();
     saveBtn.disabled = placed.length === 0;
 };
 resetBtn.onclick = () => {
@@ -484,6 +519,6 @@ saveBtn.onclick = () => {
 // --- Initial Render ---
 renderPieceTypes();
 updateImageEstimate();
-draw();
+drawAll();
 saveBtn.disabled = true;
 resetBtn.disabled = true;
